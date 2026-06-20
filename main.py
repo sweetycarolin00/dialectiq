@@ -51,8 +51,11 @@ async def translate(payload: dict):
         f'Transcribed speech: "{text}"'
     )
 
+    timeout = httpx.Timeout(connect=8.0, read=20.0, write=8.0, pool=5.0)
+    print(f"[translate] calling Anthropic: from={from_lang} to={to_lang} text={text[:60]!r}")
+
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(timeout=timeout) as client:
             resp = await client.post(
                 ANTHROPIC_URL,
                 headers={
@@ -67,11 +70,15 @@ async def translate(payload: dict):
                     "messages": [{"role": "user", "content": user_content}],
                 },
             )
+        print(f"[translate] Anthropic responded with status {resp.status_code}")
+
         data = resp.json()
 
-        if "content" not in data:
+        if resp.status_code != 200 or "content" not in data:
+            print(f"[translate] Anthropic error body: {data}")
             return JSONResponse(
-                {"error": "anthropic_api_error", "detail": data}, status_code=502
+                {"error": "anthropic_api_error", "status": resp.status_code, "detail": data},
+                status_code=502,
             )
 
         raw = "".join(block.get("text", "") for block in data["content"]).strip()
@@ -81,11 +88,17 @@ async def translate(payload: dict):
                 raw = raw[4:].strip()
 
         parsed = json.loads(raw)
+        print(f"[translate] success: {parsed}")
         return parsed
 
-    except json.JSONDecodeError:
+    except json.JSONDecodeError as exc:
+        print(f"[translate] JSON parse failed. Raw model output: {raw!r}. Error: {exc}")
         return JSONResponse({"error": "could_not_parse_model_output"}, status_code=502)
+    except httpx.TimeoutException as exc:
+        print(f"[translate] TIMEOUT talking to Anthropic: {exc!r}")
+        return JSONResponse({"error": "anthropic_timeout", "detail": str(exc)}, status_code=504)
     except Exception as exc:
+        print(f"[translate] UNEXPECTED ERROR: {type(exc).__name__}: {exc}")
         return JSONResponse({"error": "server_error", "detail": str(exc)}, status_code=500)
 
 
