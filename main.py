@@ -52,7 +52,7 @@ async def translate(payload: dict):
     )
 
     timeout = httpx.Timeout(connect=8.0, read=20.0, write=8.0, pool=5.0)
-    print(f"[translate] calling Anthropic: from={from_lang} to={to_lang} text={text[:60]!r}")
+    print(f"[translate] calling Anthropic: from={from_lang} to={to_lang} text={text[:60]!r}", flush=True)
 
     try:
         async with httpx.AsyncClient(timeout=timeout) as client:
@@ -70,12 +70,12 @@ async def translate(payload: dict):
                     "messages": [{"role": "user", "content": user_content}],
                 },
             )
-        print(f"[translate] Anthropic responded with status {resp.status_code}")
+        print(f"[translate] Anthropic responded with status {resp.status_code}", flush=True)
 
         data = resp.json()
 
         if resp.status_code != 200 or "content" not in data:
-            print(f"[translate] Anthropic error body: {data}")
+            print(f"[translate] Anthropic error body: {data}", flush=True)
             return JSONResponse(
                 {"error": "anthropic_api_error", "status": resp.status_code, "detail": data},
                 status_code=502,
@@ -88,17 +88,17 @@ async def translate(payload: dict):
                 raw = raw[4:].strip()
 
         parsed = json.loads(raw)
-        print(f"[translate] success: {parsed}")
+        print(f"[translate] success: {parsed}", flush=True)
         return parsed
 
     except json.JSONDecodeError as exc:
-        print(f"[translate] JSON parse failed. Raw model output: {raw!r}. Error: {exc}")
+        print(f"[translate] JSON parse failed. Raw model output: {raw!r}. Error: {exc}", flush=True)
         return JSONResponse({"error": "could_not_parse_model_output"}, status_code=502)
     except httpx.TimeoutException as exc:
-        print(f"[translate] TIMEOUT talking to Anthropic: {exc!r}")
+        print(f"[translate] TIMEOUT talking to Anthropic: {exc!r}", flush=True)
         return JSONResponse({"error": "anthropic_timeout", "detail": str(exc)}, status_code=504)
     except Exception as exc:
-        print(f"[translate] UNEXPECTED ERROR: {type(exc).__name__}: {exc}")
+        print(f"[translate] UNEXPECTED ERROR: {type(exc).__name__}: {exc}", flush=True)
         return JSONResponse({"error": "server_error", "detail": str(exc)}, status_code=500)
 
 
