@@ -18,10 +18,11 @@ GEMINI_URL = (
 
 SYSTEM_PROMPT = (
     "You are the dialect-aware translation engine inside an app called DialectIQ. "
-    "You receive speech-to-text transcribed in a source language which may contain "
-    "regional dialect, slang, or colloquial phrasing. Detect the dialect, normalize "
-    "to standard form preserving meaning, then translate naturally. "
-    "Respond ONLY as JSON in this exact shape: "
+    "You receive speech-to-text transcribed in a source language, which may contain "
+    "regional dialect, slang, or colloquial phrasing. Detect that dialect/slang, "
+    "normalize it to standard form in the source language preserving meaning and "
+    "cultural nuance, then translate the standardized form into the target language "
+    "with natural, fluent, non-literal phrasing. Respond ONLY as raw JSON in this shape: "
     '{"detected_dialect": string, "standard_form": string, "translation": string}.'
 )
 
@@ -31,19 +32,15 @@ def serve_index():
     return FileResponse("static/index.html")
 
 
-app.mount(
-    "/static",
-    StaticFiles(directory="static"),
-    name="static"
-)
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
 @app.post("/api/translate")
 async def translate(payload: dict):
 
-    from_lang = payload.get("from_lang")
-    to_lang = payload.get("to_lang")
-    text = payload.get("text")
+    from_lang = (payload or {}).get("from_lang")
+    to_lang = (payload or {}).get("to_lang")
+    text = (payload or {}).get("text")
 
     if not all([from_lang, to_lang, text]):
         return JSONResponse(
@@ -64,10 +61,10 @@ async def translate(payload: dict):
     )
 
     timeout = httpx.Timeout(
-        connect=8,
-        read=20,
-        write=8,
-        pool=5
+        connect=8.0,
+        read=20.0,
+        write=8.0,
+        pool=5.0
     )
 
     max_attempts = 3
@@ -76,109 +73,74 @@ async def translate(payload: dict):
 
         try:
 
-            async with httpx.AsyncClient(
-                timeout=timeout
-            ) as client:
+            async with httpx.AsyncClient(timeout=timeout) as client:
 
                 response = await client.post(
                     f"{GEMINI_URL}?key={GEMINI_API_KEY}",
                     headers={
-                        "Content-Type":
-                        "application/json"
+                        "Content-Type": "application/json"
                     },
                     json={
                         "systemInstruction": {
                             "parts": [
-                                {
-                                    "text":
-                                    SYSTEM_PROMPT
-                                }
+                                {"text": SYSTEM_PROMPT}
                             ]
                         },
                         "contents": [
                             {
                                 "parts": [
                                     {
-                                        "text":
-                                        user_content
+                                        "text": user_content
                                     }
                                 ]
                             }
                         ],
                         "generationConfig": {
-                            "responseMimeType":
-                            "application/json",
-
-                            "maxOutputTokens":
-                            500
+                            "responseMimeType": "application/json",
+                            "maxOutputTokens": 500
                         }
                     }
                 )
 
             print(
-                f"Gemini status: {response.status_code}",
+                f"[translate] Gemini status={response.status_code}",
                 flush=True
             )
 
             data = response.json()
 
-            # QUOTA HIT
+            # QUOTA EXCEEDED
             if response.status_code == 429:
 
-                if attempt < max_attempts - 1:
-
-                    print(
-                        "Retrying after quota...",
-                        flush=True
-                    )
-
-                    await asyncio.sleep(5)
-
-                    continue
-
                 return {
-                    "detected_dialect":
-                    "Unavailable",
-
-                    "standard_form":
-                    text,
-
+                    "detected_dialect": "Unavailable",
+                    "standard_form": text,
                     "translation":
-                    "Translation temporarily unavailable. Please try again."
+                    "Daily translation limit reached. Please wait and try again."
                 }
 
-            # OVERLOADED
+            # TEMPORARY OVERLOAD
             if response.status_code == 503:
 
                 if attempt < max_attempts - 1:
-
                     await asyncio.sleep(2)
-
                     continue
 
                 return {
-                    "detected_dialect":
-                    "Unavailable",
-
-                    "standard_form":
-                    text,
-
+                    "detected_dialect": "Unavailable",
+                    "standard_form": text,
                     "translation":
-                    "Translation service busy."
+                    "Translation service is busy. Try again shortly."
                 }
 
-            # OTHER ERRORS
+            # OTHER API ERRORS
             if response.status_code != 200:
 
                 return {
-                    "detected_dialect":
-                    "Unavailable",
-
-                    "standard_form":
-                    text,
-
+                    "detected_dialect": "Unavailable",
+                    "standard_form": text,
                     "translation":
-                    "Unable to translate."
+                    "Unable to translate right now."
                 }
 
             raw = (
@@ -189,19 +151,8 @@ async def translate(payload: dict):
             )
 
             if raw.startswith("```"):
-
-                raw = (
-                    raw
-                    .replace(
-                        "```json",
-                        ""
-                    )
-                    .replace(
-                        "```",
-                        ""
-                    )
-                    .strip()
-                )
+                raw = raw.replace("```json", "")
+                raw = raw.replace("```", "").strip()
 
             parsed = json.loads(raw)
 
@@ -225,22 +176,33 @@ async def translate(payload: dict):
                 )
             }
 
-        except Exception as e:
-
-            print(
-                str(e),
-                flush=True
-            )
+        except json.JSONDecodeError:
 
             return {
-                "detected_dialect":
-                "Unavailable",
-
-                "standard_form":
-                text,
-
+                "detected_dialect": "Unavailable",
+                "standard_form": text,
                 "translation":
-                "Server error."
+                "Translation completed but output format was invalid."
+            }
+
+        except httpx.TimeoutException:
+
+            return {
+                "detected_dialect": "Unavailable",
+                "standard_form": text,
+                "translation":
+                "Translation timed out. Try again."
+            }
+
+        except Exception as e:
+
+            print(e, flush=True)
+
+            return {
+                "detected_dialect": "Unavailable",
+                "standard_form": text,
+                "translation":
+                "Unexpected server error."
             }
 
 
@@ -249,8 +211,5 @@ def health():
 
     return {
         "ok": True,
-        "key_configured":
-        bool(
-            GEMINI_API_KEY
-        )
+        "key_configured": bool(GEMINI_API_KEY)
     }
