@@ -1,105 +1,585 @@
-function startListening(){
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no">
+<title>DialectIQ — Understand Every Voice</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Noto+Sans:wght@400;600;700&family=Noto+Sans+Tamil:wght@400;600;700&family=Noto+Sans+Devanagari:wght@400;600;700&family=Noto+Sans+Bengali:wght@400;600;700&family=Noto+Sans+Gujarati:wght@400;600;700&family=Noto+Sans+Gurmukhi:wght@400;600;700&family=Noto+Sans+Kannada:wght@400;600;700&family=Noto+Sans+Malayalam:wght@400;600;700&family=Noto+Sans+Telugu:wght@400;600;700&family=Noto+Sans+Arabic:wght@400;600;700&family=Noto+Sans+SC:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg-deep:#0F3D3E;
+    --bg-deep-2:#0B2D2E;
+    --card:#FFF8F0;
+    --ink:#16241F;
+    --coral:#FF6B4A;
+    --coral-dark:#E04E30;
+    --gold:#FFC857;
+    --mist:#CFEAE6;
+    --line:rgba(255,248,240,0.14);
+    --radius:28px;
+    --script: 'Noto Sans','Noto Sans Tamil','Noto Sans Devanagari','Noto Sans Bengali','Noto Sans Gujarati','Noto Sans Gurmukhi','Noto Sans Kannada','Noto Sans Malayalam','Noto Sans Telugu','Noto Sans Arabic','Noto Sans SC',sans-serif;
+    --display:'Baloo 2',var(--script);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;height:100%;}
+  body{
+    font-family:var(--display);
+    background:
+      radial-gradient(900px 600px at 50% -10%, rgba(255,200,87,0.10), transparent 60%),
+      linear-gradient(180deg,var(--bg-deep),var(--bg-deep-2));
+    color:var(--card);
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+    overflow-x:hidden;
+  }
+  .app{
+    flex:1;
+    width:100%;
+    max-width:480px;
+    margin:0 auto;
+    padding:18px 18px 28px;
+    display:flex;
+    flex-direction:column;
+    min-height:100vh;
+  }
+  .topbar{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:4px 2px 10px;
+  }
+  .brand{display:flex;align-items:center;gap:10px;}
+  .brand-mark{
+    width:38px;height:38px;border-radius:12px;
+    background:linear-gradient(145deg,var(--coral),var(--gold));
+    display:flex;align-items:center;justify-content:center;
+    font-size:20px;
+  }
+  .brand-text{font-weight:800;font-size:19px;letter-spacing:0.2px;}
+  .brand-sub{font-size:11px;color:var(--mist);opacity:0.8;margin-top:-2px;}
+  .icon-btn{
+    width:40px;height:40px;border-radius:50%;
+    background:rgba(255,248,240,0.08);border:1px solid var(--line);
+    display:flex;align-items:center;justify-content:center;
+    cursor:pointer;color:var(--card);
+  }
+  .icon-btn svg{width:18px;height:18px;}
+  .screen{display:none;flex-direction:column;flex:1;animation:fadeIn .35s ease;}
+  .screen.active{display:flex;}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:none;}}
 
+  .section-label{
+    font-size:14px;font-weight:700;color:var(--gold);
+    text-transform:uppercase;letter-spacing:0.08em;
+    margin:18px 4px 10px;display:flex;align-items:center;gap:8px;
+  }
+  .section-label .n{
+    width:22px;height:22px;border-radius:50%;background:rgba(255,200,87,0.16);
+    color:var(--gold);font-size:12px;display:flex;align-items:center;justify-content:center;font-weight:800;
+  }
+  .lang-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;}
+  .lang-tile{
+    position:relative;background:rgba(255,248,240,0.06);
+    border:1.5px solid var(--line);border-radius:18px;
+    padding:14px 6px 10px;display:flex;flex-direction:column;align-items:center;gap:8px;
+    cursor:pointer;transition:transform .12s ease, background .15s ease, border-color .15s ease;
+    min-height:88px;justify-content:center;
+  }
+  .lang-tile:active{transform:scale(0.95);}
+  .lang-tile.selected{
+    background:linear-gradient(160deg, rgba(255,107,74,0.28), rgba(255,200,87,0.18));
+    border-color:var(--coral);
+  }
+  .lang-badge{
+    width:34px;height:34px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+    font-family:var(--script);font-weight:700;font-size:15px;color:var(--bg-deep-2);
+  }
+  .lang-native{font-family:var(--script);font-weight:700;font-size:15px;line-height:1.15;text-align:center;}
+  .lang-preview{
+    position:absolute;top:4px;right:4px;width:20px;height:20px;border-radius:50%;
+    background:rgba(0,0,0,0.18);display:flex;align-items:center;justify-content:center;
+  }
+  .lang-preview svg{width:10px;height:10px;opacity:0.85;}
+
+  .cta{
+    margin-top:auto;
+    background:linear-gradient(135deg,var(--coral),var(--coral-dark));
+    color:#fff;border:none;border-radius:20px;
+    padding:18px;font-family:var(--display);font-weight:700;font-size:17px;
+    display:flex;align-items:center;justify-content:center;gap:10px;
+    cursor:pointer;box-shadow:0 14px 30px -10px rgba(255,107,74,0.55);
+    transition:opacity .2s, transform .12s;
+  }
+  .cta:active{transform:scale(0.98);}
+  .cta[disabled]{opacity:0.35;pointer-events:none;box-shadow:none;}
+  .cta svg{width:20px;height:20px;}
+
+  /* SPEAK SCREEN */
+  .speak-screen{align-items:center;justify-content:center;text-align:center;gap:6px;}
+  .pair-pill{
+    display:flex;align-items:center;gap:10px;background:rgba(255,248,240,0.07);
+    border:1px solid var(--line);border-radius:999px;padding:8px 16px;font-size:13px;font-weight:600;color:var(--mist);
+    margin-bottom:18px;
+  }
+  .pair-pill svg{width:14px;height:14px;}
+  .mic-wrap{position:relative;width:230px;height:230px;display:flex;align-items:center;justify-content:center;margin:6px 0 22px;}
+  .ripple{position:absolute;border-radius:50%;border:2px solid rgba(255,107,74,0.4);width:100%;height:100%;opacity:0;}
+  .listening .ripple{animation:ripple 1.8s ease-out infinite;}
+  .listening .ripple:nth-child(2){animation-delay:.5s;}
+  .listening .ripple:nth-child(3){animation-delay:1s;}
+  @keyframes ripple{0%{transform:scale(0.55);opacity:0.65;}100%{transform:scale(1.15);opacity:0;}}
+  .mic-btn{
+    position:relative;width:138px;height:138px;border-radius:50%;
+    background:radial-gradient(circle at 35% 30%, #ff8a6e, var(--coral) 60%, var(--coral-dark));
+    border:none;display:flex;align-items:center;justify-content:center;
+    box-shadow:0 18px 40px -12px rgba(255,107,74,0.65);
+    cursor:pointer;transition:transform .15s ease, background .2s;
+  }
+  .mic-btn:active{transform:scale(0.95);}
+  .mic-btn.stop-mode{background:radial-gradient(circle at 35% 30%, #ffd27a, var(--gold) 60%, #d99c2a);box-shadow:0 18px 40px -12px rgba(255,200,87,0.6);}
+  .mic-btn svg{width:54px;height:54px;color:#fff;}
+  .status-text{font-size:18px;font-weight:700;min-height:26px;}
+  .status-sub{font-size:13.5px;color:var(--mist);opacity:0.85;max-width:300px;}
+  .spinner-dots{display:flex;gap:6px;justify-content:center;margin-top:14px;height:10px;}
+  .spinner-dots span{width:8px;height:8px;border-radius:50%;background:var(--gold);opacity:0.35;animation:dotPulse 1.2s ease-in-out infinite;}
+  .spinner-dots span:nth-child(2){animation-delay:.15s;}
+  .spinner-dots span:nth-child(3){animation-delay:.3s;}
+  @keyframes dotPulse{0%,100%{opacity:0.25;transform:scale(0.8);}50%{opacity:1;transform:scale(1.15);}}
+  .back-row{display:flex;justify-content:flex-start;margin-bottom:8px;}
+
+  /* RESULT SCREEN */
+  .card{
+    background:var(--card);color:var(--ink);border-radius:24px;padding:20px;margin-bottom:14px;
+  }
+  .card.original{background:rgba(255,248,240,0.08);color:var(--card);border:1px solid var(--line);}
+  .card-label{font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;opacity:0.55;margin-bottom:8px;display:flex;align-items:center;gap:6px;}
+  .card-text{font-family:var(--script);font-size:21px;font-weight:600;line-height:1.45;}
+  .original .card-text{font-size:17px;font-weight:500;opacity:0.92;}
+  .dialect-pill{
+    display:inline-flex;align-items:center;gap:6px;background:rgba(255,200,87,0.18);color:var(--gold);
+    font-size:11.5px;font-weight:700;border-radius:999px;padding:5px 12px;margin-bottom:10px;
+  }
+  .dialect-pill svg{width:11px;height:11px;}
+  .play-row{display:flex;align-items:center;gap:10px;margin-top:14px;}
+  .play-btn{
+    width:46px;height:46px;border-radius:50%;background:var(--coral);border:none;
+    display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;
+  }
+  .play-btn svg{width:20px;height:20px;color:#fff;}
+  .wave{display:flex;align-items:center;gap:3px;height:22px;}
+  .wave span{width:3px;border-radius:2px;background:var(--coral-dark);opacity:0.5;}
+  .result-actions{display:flex;gap:10px;margin-top:6px;}
+  .pill-btn{
+    flex:1;background:rgba(255,248,240,0.07);border:1.5px solid var(--line);border-radius:16px;
+    padding:14px 8px;display:flex;flex-direction:column;align-items:center;gap:6px;color:var(--card);
+    cursor:pointer;font-size:12.5px;font-weight:700;
+  }
+  .pill-btn svg{width:22px;height:22px;}
+  .pill-btn:active{transform:scale(0.96);}
+
+  .hint{font-size:12.5px;color:var(--mist);opacity:0.75;text-align:center;margin-top:14px;line-height:1.5;}
+  .offline-banner{
+    display:none;align-items:center;gap:10px;background:rgba(255,107,74,0.15);
+    border:1px solid rgba(255,107,74,0.4);border-radius:14px;padding:12px 14px;font-size:13px;margin-bottom:14px;
+  }
+  .offline-banner.show{display:flex;}
+  .offline-banner svg{width:18px;height:18px;flex-shrink:0;color:var(--coral);}
+  .mute-toggle{position:absolute;}
+  .empty-note{font-size:13px;color:var(--mist);text-align:center;opacity:0.7;margin-top:8px;}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="topbar">
+    <div class="brand">
+      <div class="brand-mark">🎙️</div>
+      <div>
+        <div class="brand-text">DialectIQ</div>
+        <div class="brand-sub">Understand Every Voice</div>
+      </div>
+    </div>
+    <button class="icon-btn" id="muteBtn" title="Sound on/off">
+      <svg id="muteIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M19.07 4.93a10 10 0 010 14.14M15.54 8.46a5 5 0 010 7.07"/></svg>
+    </button>
+  </div>
+
+  <!-- SCREEN 1: choose languages -->
+  <div class="screen active" id="screen-setup">
+    <div class="offline-banner" id="offlineBanner">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 1l22 22M16.72 11.06A10.94 10.94 0 0119 12.55M5 12.55a10.94 10.94 0 015.17-2.39M10.71 5.05A16 16 0 0122.58 9M1.42 9a15.91 15.91 0 014.7-2.88M8.53 16.11a6 6 0 016.95 0M12 20h.01"/></svg>
+      <span>No internet connection — listening and translating both need one to work.</span>
+    </div>
+
+    <div class="section-label"><span class="n">1</span> I will speak in</div>
+    <div class="lang-grid" id="fromGrid"></div>
+
+    <div class="section-label"><span class="n">2</span> Translate to</div>
+    <div class="lang-grid" id="toGrid"></div>
+
+    <button class="cta" id="continueBtn" disabled>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+      Continue
+    </button>
+    <div class="hint">Tap the small dot on a tile to hear its name.</div>
+  </div>
+
+  <!-- SCREEN 2: speak -->
+  <div class="screen" id="screen-speak">
+    <div class="back-row">
+      <button class="icon-btn" id="backBtn1">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+      </button>
+    </div>
+    <div class="speak-screen">
+      <div class="pair-pill" id="pairPill"></div>
+      <div class="mic-wrap" id="micWrap">
+        <div class="ripple"></div><div class="ripple"></div><div class="ripple"></div>
+        <button class="mic-btn" id="micBtn">
+          <svg id="micIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a4 4 0 00-4 4v6a4 4 0 008 0V5a4 4 0 00-4-4z"/><path d="M19 10v1a7 7 0 01-14 0v-1M12 18v4M8 22h8"/></svg>
+        </button>
+      </div>
+      <div class="status-text" id="statusText">Tap the mic and speak</div>
+      <div class="status-sub" id="statusSub">Speak naturally — slang and local dialect are okay.</div>
+      <div class="spinner-dots" id="spinnerDots" style="display:none;"><span></span><span></span><span></span></div>
+    </div>
+  </div>
+
+  <!-- SCREEN 3: result -->
+  <div class="screen" id="screen-result">
+    <div class="back-row">
+      <button class="icon-btn" id="backBtn2">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+      </button>
+    </div>
+
+    <div class="card original">
+      <div class="card-label">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M12 1a4 4 0 00-4 4v6a4 4 0 008 0V5a4 4 0 00-4-4z"/><path d="M19 10v1a7 7 0 01-14 0v-1M12 18v4M8 22h8"/></svg>
+        You said
+      </div>
+      <div class="card-text" id="originalText">—</div>
+    </div>
+
+    <div class="card">
+      <span class="dialect-pill" id="dialectPill" style="display:none;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 010 20 15 15 0 010-20z"/></svg>
+        <span id="dialectName"></span>
+      </span>
+      <div class="card-label">Translation</div>
+      <div class="card-text" id="translatedText">—</div>
+      <div class="play-row">
+        <button class="play-btn" id="playBtn">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+        </button>
+        <div class="wave" id="wave"></div>
+      </div>
+    </div>
+
+    <div class="result-actions">
+      <button class="pill-btn" id="speakAgainBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a4 4 0 00-4 4v6a4 4 0 008 0V5a4 4 0 00-4-4z"/><path d="M19 10v1a7 7 0 01-14 0v-1M12 18v4M8 22h8"/></svg>
+        Speak again
+      </button>
+      <button class="pill-btn" id="swapBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 1l4 4-4 4M3 11V9a4 4 0 014-4h14M7 23l-4-4 4-4M21 13v2a4 4 0 01-4 4H3"/></svg>
+        They reply
+      </button>
+      <button class="pill-btn" id="changeLangBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 010 20 15 15 0 010-20z"/></svg>
+        Languages
+      </button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const LANGS = [
+  {code:'en-US', bcp:'en', native:'English', self:'English', hex:'#FFC857'},
+  {code:'hi-IN', bcp:'hi', native:'हिन्दी', self:'Hindi', hex:'#FF6B4A'},
+  {code:'ta-IN', bcp:'ta', native:'தமிழ்', self:'Tamil', hex:'#7FD1C0'},
+  {code:'te-IN', bcp:'te', native:'తెలుగు', self:'Telugu', hex:'#F4A6A0'},
+  {code:'kn-IN', bcp:'kn', native:'ಕನ್ನಡ', self:'Kannada', hex:'#B7E07A'},
+  {code:'ml-IN', bcp:'ml', native:'മലയാളം', self:'Malayalam', hex:'#9BD6E8'},
+  {code:'bn-IN', bcp:'bn', native:'বাংলা', self:'Bengali', hex:'#E8B6E0'},
+  {code:'mr-IN', bcp:'mr', native:'मराठी', self:'Marathi', hex:'#FFD89B'},
+  {code:'gu-IN', bcp:'gu', native:'ગુજરાતી', self:'Gujarati', hex:'#A7C7FF'},
+  {code:'pa-IN', bcp:'pa', native:'ਪੰਜਾਬੀ', self:'Punjabi', hex:'#FFB4A6'},
+  {code:'ur-PK', bcp:'ur', native:'اردو', self:'Urdu', hex:'#C7E89B'},
+  {code:'es-ES', bcp:'es', native:'Español', self:'Spanish', hex:'#FFD27A'},
+  {code:'fr-FR', bcp:'fr', native:'Français', self:'French', hex:'#A6D8FF'},
+  {code:'ar-SA', bcp:'ar', native:'العربية', self:'Arabic', hex:'#D6B8F5'},
+  {code:'zh-CN', bcp:'zh', native:'中文', self:'Chinese', hex:'#FF9E9E'},
+];
+
+const state = { from:null, to:null, muted:false, listening:false, transcript:'' };
+let recognition=null, recognizing=false, finalTranscript='';
+
+function $(id){return document.getElementById(id);}
+function showScreen(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  $(id).classList.add('active');
+}
+
+function buildGrid(gridId, kind){
+  const grid = $(gridId);
+  grid.innerHTML='';
+  LANGS.forEach(l=>{
+    const tile=document.createElement('div');
+    tile.className='lang-tile';
+    tile.dataset.code=l.code;
+    tile.innerHTML = `
+      <div class="lang-badge" style="background:${l.hex}">${l.native[0]}</div>
+      <div class="lang-native">${l.native}</div>
+      <div class="lang-preview" data-preview="${l.code}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a3.5 3.5 0 010 7"/></svg>
+      </div>`;
+    tile.addEventListener('click', (e)=>{
+      if(e.target.closest('[data-preview]')){
+        speakPreview(l);
+        return;
+      }
+      grid.querySelectorAll('.lang-tile').forEach(t=>t.classList.remove('selected'));
+      tile.classList.add('selected');
+      state[kind]=l;
+      checkContinue();
+    });
+    grid.appendChild(tile);
+  });
+}
+buildGrid('fromGrid','from');
+buildGrid('toGrid','to');
+
+function speakPreview(l){
+  if(state.muted) return;
+  try{
+    const u = new SpeechSynthesisUtterance(l.self);
+    u.lang = l.code;
+    u.rate = 0.95;
+    speechSynthesis.speak(u);
+  }catch(e){}
+}
+
+function checkContinue(){
+  $('continueBtn').disabled = !(state.from && state.to);
+}
+
+$('continueBtn').addEventListener('click', ()=>{
+  if(!navigator.onLine){ $('offlineBanner').classList.add('show'); return; }
+  updatePairPill();
+  showScreen('screen-speak');
+  resetSpeakUI();
+  announce(`Tap the microphone and speak in ${state.from.self}.`, state.from.code);
+});
+
+function updatePairPill(){
+  $('pairPill').innerHTML = `<span>${state.from.native}</span>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+    <span>${state.to.native}</span>`;
+}
+
+$('backBtn1').addEventListener('click', ()=>{ stopListening(); showScreen('screen-setup'); });
+$('backBtn2').addEventListener('click', ()=>showScreen('screen-setup'));
+$('changeLangBtn').addEventListener('click', ()=>showScreen('screen-setup'));
+
+function resetSpeakUI(){
+  finalTranscript='';
+  $('micWrap').classList.remove('listening');
+  $('micBtn').classList.remove('stop-mode');
+  $('statusText').textContent='Tap the mic and speak';
+  $('statusSub').textContent='Speak naturally — slang and local dialect are okay.';
+  $('spinnerDots').style.display='none';
+}
+
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+function startListening(){
   if(!SR){
-    $('statusText').textContent='Mic not supported';
-    $('statusSub').textContent='Use Chrome or Edge';
+    $('statusText').textContent='Mic not supported here';
+    $('statusSub').textContent='Try Chrome on Android, desktop Chrome, or Edge.';
     return;
   }
-
   finalTranscript='';
-
+  let finalChunks = [];
   recognition = new SR();
-
   recognition.lang = state.from.code;
-
-  recognition.continuous = false;
-
-  recognition.interimResults = false;
-
+  recognition.interimResults = true;
+  recognition.continuous = true;
   recognition.onresult = (ev)=>{
-
-    if(
-      ev.results &&
-      ev.results.length
-    ){
-
-      finalTranscript =
-        ev.results[0][0]
-        .transcript
-        .trim();
-
-      $('statusSub').textContent =
-        finalTranscript;
+    let interim='';
+    for(let i=0;i<ev.results.length;i++){
+      const result = ev.results[i];
+      const transcript = result[0].transcript.trim();
+      if(result.isFinal){
+        if(!transcript) continue;
+        if(finalChunks.length > 0){
+          const last = finalChunks[finalChunks.length - 1];
+          // Android often redelivers the same phrase as it keeps growing
+          // ("I" -> "I want" -> "I want to go"), each time marked final but
+          // with a fresh index. If the new chunk is a longer/shorter version
+          // of the previous one, merge them instead of stacking both.
+          if(transcript.startsWith(last) || last.startsWith(transcript)){
+            finalChunks[finalChunks.length - 1] = transcript.length > last.length ? transcript : last;
+          } else if(transcript !== last){
+            finalChunks.push(transcript);
+          }
+        } else {
+          finalChunks.push(transcript);
+        }
+      } else if(i >= ev.resultIndex){
+        interim += transcript;
+      }
+    }
+    finalTranscript = finalChunks.join(' ') + ' ';
+    $('statusSub').textContent = (finalTranscript+interim).trim().slice(-90) || 'Listening...';
+  };
+  recognition.onerror = (ev)=>{
+    stopListening();
+    $('statusText').textContent='Could not hear you';
+    $('statusSub').textContent = ev.error==='not-allowed' ? 'Microphone permission was blocked.' : 'Please try again.';
+  };
+  recognition.onend = ()=>{
+    // Intentionally no auto-restart here: restarting mid-listen is what caused
+    // duplicated/repeated words on Android. If it stops on its own (e.g. after
+    // a pause), just reflect that in the UI instead of silently relaunching.
+    if(recognizing){
+      recognizing=false;
+      $('micWrap').classList.remove('listening');
+      $('micBtn').classList.remove('stop-mode');
+      const text = finalTranscript.trim();
+      if(text){
+        processTranslation(text);
+      } else {
+        $('statusText').textContent='Tap the mic to speak';
+        $('statusSub').textContent='It stopped listening — tap to try again.';
+      }
     }
   };
-
-  recognition.onerror = ()=>{
-
-    recognizing=false;
-
-    $('micWrap')
-      .classList
-      .remove('listening');
-
-    $('micBtn')
-      .classList
-      .remove('stop-mode');
-
-    $('statusText').textContent =
-      'Try again';
-  };
-
-  recognition.onend = async ()=>{
-
-    recognizing=false;
-
-    $('micWrap')
-      .classList
-      .remove('listening');
-
-    $('micBtn')
-      .classList
-      .remove('stop-mode');
-
-    const text =
-      finalTranscript;
-
-    finalTranscript='';
-
-    if(text){
-
-      $('statusText').textContent =
-        'Translating...';
-
-      await processTranslation(
-        text
-      );
-
-    }else{
-
-      $('statusText').textContent =
-        'Tap mic';
-
-      $('statusSub').textContent =
-        '';
-    }
-  };
-
   recognition.start();
-
   recognizing=true;
-
-  $('micWrap')
-    .classList
-    .add('listening');
-
-  $('micBtn')
-    .classList
-    .add('stop-mode');
-
-  $('statusText').textContent =
-    'Listening...';
-
-  $('statusSub').textContent =
-    '';
+  $('micWrap').classList.add('listening');
+  $('micBtn').classList.add('stop-mode');
+  $('statusText').textContent='Listening...';
+  $('statusSub').textContent='Tap again to stop.';
 }
+
+function stopListening(){
+  recognizing=false;
+  if(recognition){ try{ recognition.stop(); }catch(e){} }
+  $('micWrap').classList.remove('listening');
+  $('micBtn').classList.remove('stop-mode');
+}
+
+$('micBtn').addEventListener('click', ()=>{
+  if(!recognizing){
+    startListening();
+  } else {
+    stopListening();
+    setTimeout(()=>{
+      const text = finalTranscript.trim();
+      if(!text){
+        $('statusText').textContent="Didn't catch that";
+        $('statusSub').textContent='Tap the mic and try again.';
+        return;
+      }
+      processTranslation(text);
+    }, 250);
+  }
+});
+
+async function processTranslation(text){
+  $('statusText').textContent='Understanding your words...';
+  $('statusSub').textContent='Detecting dialect and translating';
+  $('spinnerDots').style.display='flex';
+
+  try{
+    const response = await fetch("/api/translate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        from_lang: state.from.self,
+        to_lang: state.to.self,
+        text: text
+      })
+    });
+    const parsed = await response.json();
+    if(parsed.error){ throw new Error(parsed.error); }
+
+    $('originalText').textContent = text;
+    $('translatedText').textContent = parsed.translation || '—';
+    if(parsed.detected_dialect && parsed.detected_dialect.toLowerCase()!=='standard'){
+      $('dialectPill').style.display='inline-flex';
+      $('dialectName').textContent = 'Detected: '+parsed.detected_dialect;
+    } else {
+      $('dialectPill').style.display='none';
+    }
+    buildWave();
+    showScreen('screen-result');
+    playTranslation(parsed.translation);
+  }catch(err){
+    $('statusText').textContent='Something went wrong';
+    $('statusSub').textContent='Check your connection and tap the mic to try again.';
+    $('spinnerDots').style.display='none';
+  }
+}
+
+function buildWave(){
+  const wave=$('wave'); wave.innerHTML='';
+  for(let i=0;i<16;i++){
+    const bar=document.createElement('span');
+    bar.style.height=(6+Math.random()*16)+'px';
+    wave.appendChild(bar);
+  }
+}
+
+function playTranslation(text){
+  if(state.muted || !text) return;
+  try{
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = state.to.code;
+    u.rate = 0.95;
+    speechSynthesis.speak(u);
+  }catch(e){}
+}
+
+$('playBtn').addEventListener('click', ()=>playTranslation($('translatedText').textContent));
+
+$('speakAgainBtn').addEventListener('click', ()=>{
+  showScreen('screen-speak');
+  resetSpeakUI();
+});
+
+$('swapBtn').addEventListener('click', ()=>{
+  const tmp = state.from; state.from = state.to; state.to = tmp;
+  updatePairPill();
+  showScreen('screen-speak');
+  resetSpeakUI();
+  announce(`Now your turn to reply in ${state.from.self}.`, state.from.code);
+});
+
+function announce(text, lang){
+  if(state.muted) return;
+  try{
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = lang || 'en-US';
+    u.rate = 0.95;
+    speechSynthesis.speak(u);
+  }catch(e){}
+}
+
+$('muteBtn').addEventListener('click', ()=>{
+  state.muted = !state.muted;
+  $('muteIcon').style.opacity = state.muted ? 0.35 : 1;
+  if(state.muted) speechSynthesis.cancel();
+});
+
+window.addEventListener('online', ()=>$('offlineBanner').classList.remove('show'));
+window.addEventListener('offline', ()=>$('offlineBanner').classList.add('show'));
+if(!navigator.onLine) $('offlineBanner').classList.add('show');
+</script>
+</body>
+</html>
