@@ -402,26 +402,24 @@ function startListening(){
     return;
   }
   finalTranscript='';
-  let lastFinalChunk='';
+  let finalChunks = [];
   recognition = new SR();
   recognition.lang = state.from.code;
   recognition.interimResults = true;
   recognition.continuous = true;
   recognition.onresult = (ev)=>{
     let interim='';
-    for(let i=ev.resultIndex;i<ev.results.length;i++){
+    for(let i=0;i<ev.results.length;i++){
       if(ev.results[i].isFinal){
-        const chunk = ev.results[i][0].transcript.trim();
-        // Android's speech engine sometimes re-fires the same final chunk after a silent restart.
-        // Skip it if it's identical to what we just added.
-        if(chunk && chunk !== lastFinalChunk){
-          finalTranscript += chunk + ' ';
-          lastFinalChunk = chunk;
-        }
-      } else {
+        // Android sometimes redelivers the same result index multiple times as it
+        // refines the transcript, each time marked "final". Overwrite by index
+        // instead of appending, so growing versions replace rather than stack.
+        finalChunks[i] = ev.results[i][0].transcript.trim();
+      } else if(i >= ev.resultIndex){
         interim += ev.results[i][0].transcript;
       }
     }
+    finalTranscript = finalChunks.filter(Boolean).join(' ') + ' ';
     $('statusSub').textContent = (finalTranscript+interim).trim().slice(-90) || 'Listening...';
   };
   recognition.onerror = (ev)=>{
