@@ -1,94 +1,88 @@
 function startListening(){
+
   if(!SR){
     $('statusText').textContent='Mic not supported here';
-    $('statusSub').textContent='Try Chrome on Android, desktop Chrome, or Edge.';
+    $('statusSub').textContent='Try Chrome or Edge.';
     return;
   }
 
   finalTranscript='';
-  let finalChunks=[];
 
   recognition = new SR();
 
   recognition.lang = state.from.code;
 
-  // FIX 1 → prevent repeated recognition cycles
+  // Stop repeated sessions
   recognition.continuous = false;
 
-  // FIX 2 → keep live preview
-  recognition.interimResults = true;
+  // Only final text
+  recognition.interimResults = false;
 
   recognition.onresult = (ev)=>{
-    let interim='';
 
-    // ONLY process new results
-    for(let i = ev.resultIndex; i < ev.results.length; i++){
+    const result =
+      ev.results[
+        ev.results.length - 1
+      ];
 
-      const result = ev.results[i];
-      const transcript = result[0].transcript.trim();
+    if(
+      result &&
+      result.isFinal
+    ){
 
-      if(!transcript) continue;
+      finalTranscript =
+        result[0]
+        .transcript
+        .trim();
 
-      if(result.isFinal){
-
-        const last = finalChunks[finalChunks.length - 1];
-
-        // prevent duplicate transcript
-        if(
-          !last ||
-          (
-            transcript !== last &&
-            !transcript.includes(last) &&
-            !last.includes(transcript)
-          )
-        ){
-          finalChunks.push(transcript);
-
-        }else{
-          // replace shorter phrase with longer one
-          finalChunks[finalChunks.length - 1] =
-            transcript.length > last.length
-              ? transcript
-              : last;
-        }
-
-      }else{
-        interim += transcript + ' ';
-      }
+      $('statusSub').textContent =
+        finalTranscript;
     }
-
-    finalTranscript = finalChunks.join(' ').trim();
-
-    $('statusSub').textContent =
-      (finalTranscript + ' ' + interim).trim() ||
-      'Listening...';
   };
 
   recognition.onerror = (ev)=>{
+
     stopListening();
 
-    $('statusText').textContent='Could not hear you';
+    $('statusText').textContent =
+      'Could not hear you';
 
     $('statusSub').textContent =
       ev.error === 'not-allowed'
-        ? 'Microphone permission was blocked.'
-        : 'Please try again.';
+      ? 'Microphone blocked.'
+      : 'Try again.';
   };
 
   recognition.onend = ()=>{
 
-    $('micWrap').classList.remove('listening');
-    $('micBtn').classList.remove('stop-mode');
-
     recognizing = false;
 
-    const text = finalTranscript.trim();
+    $('micWrap')
+      .classList
+      .remove('listening');
+
+    $('micBtn')
+      .classList
+      .remove('stop-mode');
+
+    const text =
+      finalTranscript
+      .trim();
 
     if(text){
+
+      // prevent duplicate call
+      finalTranscript='';
+
       processTranslation(text);
+
     }else{
-      $('statusText').textContent='Tap the mic to speak';
-      $('statusSub').textContent='Try speaking again.';
+
+      $('statusText').textContent =
+        'Tap the mic to speak';
+
+      $('statusSub').textContent =
+        'Try again.';
     }
   };
 
@@ -96,10 +90,17 @@ function startListening(){
 
   recognizing = true;
 
-  $('micWrap').classList.add('listening');
-  $('micBtn').classList.add('stop-mode');
+  $('micWrap')
+    .classList
+    .add('listening');
 
-  $('statusText').textContent='Listening...';
+  $('micBtn')
+    .classList
+    .add('stop-mode');
 
-  $('statusSub').textContent='Tap again to stop.';
+  $('statusText').textContent =
+    'Listening...';
+
+  $('statusSub').textContent =
+    'Speak now.';
 }
