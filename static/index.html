@@ -1,44 +1,41 @@
-function startListening() {
+function startListening(){
 
-  if (!SR) {
-    $('statusText').textContent = 'Mic not supported';
+  if(!SR){
+    $('statusText').textContent='Mic not supported';
+    $('statusSub').textContent='Use Chrome or Edge';
     return;
   }
 
-  finalTranscript = '';
+  finalTranscript='';
 
   recognition = new SR();
 
   recognition.lang = state.from.code;
 
   recognition.continuous = false;
+
   recognition.interimResults = false;
 
-  recognition.onresult = (ev) => {
+  recognition.onresult = (ev)=>{
 
-    const transcript =
-      ev.results[0][0]
-      .transcript
-      .trim();
+    if(
+      ev.results &&
+      ev.results.length
+    ){
 
-    finalTranscript =
-      transcript;
+      finalTranscript =
+        ev.results[0][0]
+        .transcript
+        .trim();
 
-    $('statusSub').textContent =
-      transcript;
+      $('statusSub').textContent =
+        finalTranscript;
+    }
   };
 
-  recognition.onerror = () => {
+  recognition.onerror = ()=>{
 
-    recognizing = false;
-
-    $('statusText').textContent =
-      'Try again';
-  };
-
-  recognition.onend = () => {
-
-    recognizing = false;
+    recognizing=false;
 
     $('micWrap')
       .classList
@@ -48,19 +45,49 @@ function startListening() {
       .classList
       .remove('stop-mode');
 
-    if (
-      finalTranscript
-    ) {
+    $('statusText').textContent =
+      'Try again';
+  };
 
-      processTranslation(
-        finalTranscript
+  recognition.onend = async ()=>{
+
+    recognizing=false;
+
+    $('micWrap')
+      .classList
+      .remove('listening');
+
+    $('micBtn')
+      .classList
+      .remove('stop-mode');
+
+    const text =
+      finalTranscript;
+
+    finalTranscript='';
+
+    if(text){
+
+      $('statusText').textContent =
+        'Translating...';
+
+      await processTranslation(
+        text
       );
+
+    }else{
+
+      $('statusText').textContent =
+        'Tap mic';
+
+      $('statusSub').textContent =
+        '';
     }
   };
 
   recognition.start();
 
-  recognizing = true;
+  recognizing=true;
 
   $('micWrap')
     .classList
