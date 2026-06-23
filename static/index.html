@@ -410,16 +410,29 @@ function startListening(){
   recognition.onresult = (ev)=>{
     let interim='';
     for(let i=0;i<ev.results.length;i++){
-      if(ev.results[i].isFinal){
-        // Android sometimes redelivers the same result index multiple times as it
-        // refines the transcript, each time marked "final". Overwrite by index
-        // instead of appending, so growing versions replace rather than stack.
-        finalChunks[i] = ev.results[i][0].transcript.trim();
+      const result = ev.results[i];
+      const transcript = result[0].transcript.trim();
+      if(result.isFinal){
+        if(!transcript) continue;
+        if(finalChunks.length > 0){
+          const last = finalChunks[finalChunks.length - 1];
+          // Android often redelivers the same phrase as it keeps growing
+          // ("I" -> "I want" -> "I want to go"), each time marked final but
+          // with a fresh index. If the new chunk is a longer/shorter version
+          // of the previous one, merge them instead of stacking both.
+          if(transcript.startsWith(last) || last.startsWith(transcript)){
+            finalChunks[finalChunks.length - 1] = transcript.length > last.length ? transcript : last;
+          } else if(transcript !== last){
+            finalChunks.push(transcript);
+          }
+        } else {
+          finalChunks.push(transcript);
+        }
       } else if(i >= ev.resultIndex){
-        interim += ev.results[i][0].transcript;
+        interim += transcript;
       }
     }
-    finalTranscript = finalChunks.filter(Boolean).join(' ') + ' ';
+    finalTranscript = finalChunks.join(' ') + ' ';
     $('statusSub').textContent = (finalTranscript+interim).trim().slice(-90) || 'Listening...';
   };
   recognition.onerror = (ev)=>{
