@@ -1,142 +1,60 @@
-function startListening(){
+function startListening() {
 
-  if(!SR){
-    $('statusText').textContent =
-      'Mic not supported here';
-
-    $('statusSub').textContent =
-      'Try Chrome or Edge.';
-
+  if (!SR) {
+    $('statusText').textContent = 'Mic not supported';
     return;
   }
 
-  // reset
   finalTranscript = '';
 
   recognition = new SR();
 
-  recognition.lang =
-    state.from.code;
+  recognition.lang = state.from.code;
 
-  // prevent repeated listening
   recognition.continuous = false;
-
-  // only final speech
   recognition.interimResults = false;
 
-  let translated = false;
+  recognition.onresult = (ev) => {
 
-  recognition.onresult = (ev)=>{
-
-    const result =
-      ev.results[
-        ev.results.length - 1
-      ];
-
-    if(
-      result &&
-      result.isFinal
-    ){
-
-      const transcript =
-        result[0]
-        .transcript
-        .trim();
-
-      if(
-        transcript &&
-        transcript !==
-        finalTranscript
-      ){
-
-        finalTranscript =
-          transcript;
-
-        $('statusSub').textContent =
-          transcript;
-      }
-    }
-  };
-
-  recognition.onerror = (ev)=>{
-
-    recognizing = false;
-
-    $('micWrap')
-      .classList
-      .remove(
-        'listening'
-      );
-
-    $('micBtn')
-      .classList
-      .remove(
-        'stop-mode'
-      );
-
-    $('statusText')
-      .textContent =
-      'Could not hear you';
-
-    $('statusSub')
-      .textContent =
-      ev.error ===
-      'not-allowed'
-      ? 'Microphone blocked.'
-      : 'Try again.';
-  };
-
-  recognition.onend = ()=>{
-
-    recognizing = false;
-
-    $('micWrap')
-      .classList
-      .remove(
-        'listening'
-      );
-
-    $('micBtn')
-      .classList
-      .remove(
-        'stop-mode'
-      );
-
-    const text =
-      finalTranscript
+    const transcript =
+      ev.results[0][0]
+      .transcript
       .trim();
 
-    if(
-      text &&
-      !translated
-    ){
+    finalTranscript =
+      transcript;
 
-      translated = true;
+    $('statusSub').textContent =
+      transcript;
+  };
 
-      $('statusText')
-        .textContent =
-        'Translating...';
+  recognition.onerror = () => {
 
-      setTimeout(()=>{
+    recognizing = false;
 
-        processTranslation(
-          text
-        );
+    $('statusText').textContent =
+      'Try again';
+  };
 
-      }, 600);
+  recognition.onend = () => {
 
-      finalTranscript =
-        '';
+    recognizing = false;
 
-    }else{
+    $('micWrap')
+      .classList
+      .remove('listening');
 
-      $('statusText')
-        .textContent =
-        'Tap the mic to speak';
+    $('micBtn')
+      .classList
+      .remove('stop-mode');
 
-      $('statusSub')
-        .textContent =
-        'Try again.';
+    if (
+      finalTranscript
+    ) {
+
+      processTranslation(
+        finalTranscript
+      );
     }
   };
 
@@ -146,21 +64,15 @@ function startListening(){
 
   $('micWrap')
     .classList
-    .add(
-      'listening'
-    );
+    .add('listening');
 
   $('micBtn')
     .classList
-    .add(
-      'stop-mode'
-    );
+    .add('stop-mode');
 
-  $('statusText')
-    .textContent =
+  $('statusText').textContent =
     'Listening...';
 
-  $('statusSub')
-    .textContent =
-    'Speak now.';
+  $('statusSub').textContent =
+    '';
 }
