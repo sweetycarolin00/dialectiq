@@ -10,7 +10,11 @@ app = FastAPI(title="DialectIQ Backend")
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 GEMINI_MODEL = "gemini-2.5-flash"
-GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
+
+GEMINI_URL = (
+    f"https://generativelanguage.googleapis.com/v1beta/models/"
+    f"{GEMINI_MODEL}:generateContent"
+)
 
 SYSTEM_PROMPT = (
     "You are the dialect-aware translation engine inside an app called DialectIQ. "
@@ -18,11 +22,8 @@ SYSTEM_PROMPT = (
     "regional dialect, slang, or colloquial phrasing. Detect that dialect/slang, "
     "normalize it to standard form in the source language preserving meaning and "
     "cultural nuance, then translate the standardized form into the target language "
-    "with natural, fluent, non-literal phrasing. Respond with ONLY a raw JSON object, "
-    "no markdown fences, no commentary, in exactly this shape: "
-    '{"detected_dialect": string, "standard_form": string, "translation": string}. '
-    "For detected_dialect: name the specific regional dialect or slang style if you can "
-    "identify one (for example 'Madurai Tamil colloquial'), otherwise use \"Standard\"."
+    "with natural, fluent, non-literal phrasing. Respond ONLY as raw JSON in this shape: "
+    '{"detected_dialect": string, "standard_form": string, "translation": string}.'
 )
 
 
@@ -36,15 +37,22 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 @app.post("/api/translate")
 async def translate(payload: dict):
+
     from_lang = (payload or {}).get("from_lang")
     to_lang = (payload or {}).get("to_lang")
     text = (payload or {}).get("text")
 
     if not all([from_lang, to_lang, text]):
-        return JSONResponse({"error": "missing_fields"}, status_code=400)
+        return JSONResponse(
+            {"error": "missing_fields"},
+            status_code=400
+        )
 
     if not GEMINI_API_KEY:
-        return JSONResponse({"error": "server_missing_api_key"}, status_code=500)
+        return JSONResponse(
+            {"error": "server_missing_api_key"},
+            status_code=500
+        )
 
     user_content = (
         f"Source language: {from_lang}\n"
@@ -52,70 +60,156 @@ async def translate(payload: dict):
         f'Transcribed speech: "{text}"'
     )
 
-    timeout = httpx.Timeout(connect=8.0, read=20.0, write=8.0, pool=5.0)
-    print(f"[translate] calling Gemini: from={from_lang} to={to_lang} text={text[:60]!r}", flush=True)
+    timeout = httpx.Timeout(
+        connect=8.0,
+        read=20.0,
+        write=8.0,
+        pool=5.0
+    )
 
     max_attempts = 3
-    last_error_response = None
 
-    for attempt in range(1, max_attempts + 1):
+    for attempt in range(max_attempts):
+
         try:
+
             async with httpx.AsyncClient(timeout=timeout) as client:
-                resp = await client.post(
+
+                response = await client.post(
                     f"{GEMINI_URL}?key={GEMINI_API_KEY}",
-                    headers={"content-type": "application/json"},
+                    headers={
+                        "Content-Type": "application/json"
+                    },
                     json={
-                        "systemInstruction": {"parts": [{"text": SYSTEM_PROMPT}]},
-                        "contents": [{"parts": [{"text": user_content}]}],
+                        "systemInstruction": {
+                            "parts": [
+                                {"text": SYSTEM_PROMPT}
+                            ]
+                        },
+                        "contents": [
+                            {
+                                "parts": [
+                                    {
+                                        "text": user_content
+                                    }
+                                ]
+                            }
+                        ],
                         "generationConfig": {
                             "responseMimeType": "application/json",
-                            "maxOutputTokens": 3000,
-                        },
-                    },
+                            "maxOutputTokens": 500
+                        }
+                    }
                 )
-            print(f"[translate] attempt {attempt}: Gemini responded with status {resp.status_code}", flush=True)
 
-            data = resp.json()
+            print(
+                f"[translate] Gemini status={response.status_code}",
+                flush=True
+            )
 
-            if resp.status_code == 503:
-                print(f"[translate] attempt {attempt}: model overloaded, will retry", flush=True)
-                last_error_response = JSONResponse(
-                    {"error": "gemini_overloaded", "status": 503, "detail": data},
-                    status_code=503,
-                )
-                if attempt < max_attempts:
-                    await asyncio.sleep(1.5 * attempt)
+            data = response.json()
+
+            # QUOTA EXCEEDED
+            if response.status_code == 429:
+
+                return {
+                    "detected_dialect": "Unavailable",
+                    "standard_form": text,
+                    "translation":
+                    "Daily translation limit reached. Please wait and try again."
+                }
+
+            # TEMPORARY OVERLOAD
+            if response.status_code == 503:
+
+                if attempt < max_attempts - 1:
+                    await asyncio.sleep(2)
                     continue
-                return last_error_response
 
-            if resp.status_code != 200:
-                print(f"[translate] Gemini error body: {data}", flush=True)
-                return JSONResponse(
-                    {"error": "gemini_api_error", "status": resp.status_code, "detail": data},
-                    status_code=502,
-                )
+                return {
+                    "detected_dialect": "Unavailable",
+                    "standard_form": text,
+                    "translation":
+                    "Translation service is busy. Try again shortly."
+                }
 
-            raw = data["candidates"][0]["content"]["parts"][0]["text"].strip()
+            # OTHER API ERRORS
+            if response.status_code != 200:
+
+                return {
+                    "detected_dialect": "Unavailable",
+                    "standard_form": text,
+                    "translation":
+                    "Unable to translate right now."
+                }
+
+            raw = (
+                data["candidates"][0]
+                ["content"]["parts"][0]
+                ["text"]
+                .strip()
+            )
+
             if raw.startswith("```"):
-                raw = raw.strip("`")
-                if raw.lower().startswith("json"):
-                    raw = raw[4:].strip()
+                raw = raw.replace("```json", "")
+                raw = raw.replace("```", "").strip()
 
             parsed = json.loads(raw)
-            print(f"[translate] success on attempt {attempt}: {parsed}", flush=True)
-            return parsed
 
-        except json.JSONDecodeError as exc:
-            print(f"[translate] JSON parse failed. Raw model output: {raw!r}. Error: {exc}", flush=True)
-            return JSONResponse({"error": "could_not_parse_model_output"}, status_code=502)
-        except httpx.TimeoutException as exc:
-            print(f"[translate] TIMEOUT talking to Gemini: {exc!r}", flush=True)
-            return JSONResponse({"error": "gemini_timeout", "detail": str(exc)}, status_code=504)
-        except Exception as exc:
-            print(f"[translate] UNEXPECTED ERROR: {type(exc).__name__}: {exc}", flush=True)
-            return JSONResponse({"error": "server_error", "detail": str(exc)}, status_code=500)
+            return {
+                "detected_dialect":
+                parsed.get(
+                    "detected_dialect",
+                    "Standard"
+                ),
+
+                "standard_form":
+                parsed.get(
+                    "standard_form",
+                    text
+                ),
+
+                "translation":
+                parsed.get(
+                    "translation",
+                    text
+                )
+            }
+
+        except json.JSONDecodeError:
+
+            return {
+                "detected_dialect": "Unavailable",
+                "standard_form": text,
+                "translation":
+                "Translation completed but output format was invalid."
+            }
+
+        except httpx.TimeoutException:
+
+            return {
+                "detected_dialect": "Unavailable",
+                "standard_form": text,
+                "translation":
+                "Translation timed out. Try again."
+            }
+
+        except Exception as e:
+
+            print(e, flush=True)
+
+            return {
+                "detected_dialect": "Unavailable",
+                "standard_form": text,
+                "translation":
+                "Unexpected server error."
+            }
 
 
 @app.get("/api/health")
 def health():
-    return {"ok": True, "key_configured": bool(GEMINI_API_KEY)}
+
+    return {
+        "ok": True,
+        "key_configured": bool(GEMINI_API_KEY)
+    }
