@@ -402,37 +402,26 @@ function startListening(){
     return;
   }
   finalTranscript='';
-  let finalChunks = [];
+  let lastFinalChunk='';
   recognition = new SR();
   recognition.lang = state.from.code;
   recognition.interimResults = true;
   recognition.continuous = true;
   recognition.onresult = (ev)=>{
     let interim='';
-    for(let i=0;i<ev.results.length;i++){
-      const result = ev.results[i];
-      const transcript = result[0].transcript.trim();
-      if(result.isFinal){
-        if(!transcript) continue;
-        if(finalChunks.length > 0){
-          const last = finalChunks[finalChunks.length - 1];
-          // Android often redelivers the same phrase as it keeps growing
-          // ("I" -> "I want" -> "I want to go"), each time marked final but
-          // with a fresh index. If the new chunk is a longer/shorter version
-          // of the previous one, merge them instead of stacking both.
-          if(transcript.startsWith(last) || last.startsWith(transcript)){
-            finalChunks[finalChunks.length - 1] = transcript.length > last.length ? transcript : last;
-          } else if(transcript !== last){
-            finalChunks.push(transcript);
-          }
-        } else {
-          finalChunks.push(transcript);
+    for(let i=ev.resultIndex;i<ev.results.length;i++){
+      if(ev.results[i].isFinal){
+        const chunk = ev.results[i][0].transcript.trim();
+        // Android's speech engine sometimes re-fires the same final chunk after a silent restart.
+        // Skip it if it's identical to what we just added.
+        if(chunk && chunk !== lastFinalChunk){
+          finalTranscript += chunk + ' ';
+          lastFinalChunk = chunk;
         }
-      } else if(i >= ev.resultIndex){
-        interim += transcript;
+      } else {
+        interim += ev.results[i][0].transcript;
       }
     }
-    finalTranscript = finalChunks.join(' ') + ' ';
     $('statusSub').textContent = (finalTranscript+interim).trim().slice(-90) || 'Listening...';
   };
   recognition.onerror = (ev)=>{
