@@ -402,6 +402,7 @@ function startListening(){
     return;
   }
   finalTranscript='';
+  let lastFinalChunk='';
   recognition = new SR();
   recognition.lang = state.from.code;
   recognition.interimResults = true;
@@ -409,8 +410,17 @@ function startListening(){
   recognition.onresult = (ev)=>{
     let interim='';
     for(let i=ev.resultIndex;i<ev.results.length;i++){
-      if(ev.results[i].isFinal) finalTranscript += ev.results[i][0].transcript + ' ';
-      else interim += ev.results[i][0].transcript;
+      if(ev.results[i].isFinal){
+        const chunk = ev.results[i][0].transcript.trim();
+        // Android's speech engine sometimes re-fires the same final chunk after a silent restart.
+        // Skip it if it's identical to what we just added.
+        if(chunk && chunk !== lastFinalChunk){
+          finalTranscript += chunk + ' ';
+          lastFinalChunk = chunk;
+        }
+      } else {
+        interim += ev.results[i][0].transcript;
+      }
     }
     $('statusSub').textContent = (finalTranscript+interim).trim().slice(-90) || 'Listening...';
   };
@@ -420,7 +430,21 @@ function startListening(){
     $('statusSub').textContent = ev.error==='not-allowed' ? 'Microphone permission was blocked.' : 'Please try again.';
   };
   recognition.onend = ()=>{
-    if(recognizing){ try{ recognition.start(); }catch(e){} }
+    // Intentionally no auto-restart here: restarting mid-listen is what caused
+    // duplicated/repeated words on Android. If it stops on its own (e.g. after
+    // a pause), just reflect that in the UI instead of silently relaunching.
+    if(recognizing){
+      recognizing=false;
+      $('micWrap').classList.remove('listening');
+      $('micBtn').classList.remove('stop-mode');
+      const text = finalTranscript.trim();
+      if(text){
+        processTranslation(text);
+      } else {
+        $('statusText').textContent='Tap the mic to speak';
+        $('statusSub').textContent='It stopped listening — tap to try again.';
+      }
+    }
   };
   recognition.start();
   recognizing=true;
