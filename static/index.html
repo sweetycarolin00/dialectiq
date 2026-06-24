@@ -262,6 +262,14 @@
       <div class="card-text" id="originalText">—</div>
     </div>
 
+    <div class="card original" id="correctedCard" style="display:none;">
+      <div class="card-label">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="13" height="13"><path d="M20 6L9 17l-5-5"/></svg>
+        Grammar corrected
+      </div>
+      <div class="card-text" id="correctedText">—</div>
+    </div>
+
     <div class="card">
       <span class="dialect-pill" id="dialectPill" style="display:none;">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 010 20 15 15 0 010-20z"/></svg>
@@ -402,26 +410,37 @@ function startListening(){
     return;
   }
   finalTranscript='';
-  let lastFinalChunk='';
+  let finalChunks = [];
   recognition = new SR();
   recognition.lang = state.from.code;
   recognition.interimResults = true;
   recognition.continuous = true;
   recognition.onresult = (ev)=>{
     let interim='';
-    for(let i=ev.resultIndex;i<ev.results.length;i++){
-      if(ev.results[i].isFinal){
-        const chunk = ev.results[i][0].transcript.trim();
-        // Android's speech engine sometimes re-fires the same final chunk after a silent restart.
-        // Skip it if it's identical to what we just added.
-        if(chunk && chunk !== lastFinalChunk){
-          finalTranscript += chunk + ' ';
-          lastFinalChunk = chunk;
+    for(let i=0;i<ev.results.length;i++){
+      const result = ev.results[i];
+      const transcript = result[0].transcript.trim();
+      if(result.isFinal){
+        if(!transcript) continue;
+        if(finalChunks.length > 0){
+          const last = finalChunks[finalChunks.length - 1];
+          // Android often redelivers the same phrase as it keeps growing
+          // ("I" -> "I want" -> "I want to go"), each time marked final but
+          // with a fresh index. If the new chunk is a longer/shorter version
+          // of the previous one, merge them instead of stacking both.
+          if(transcript.startsWith(last) || last.startsWith(transcript)){
+            finalChunks[finalChunks.length - 1] = transcript.length > last.length ? transcript : last;
+          } else if(transcript !== last){
+            finalChunks.push(transcript);
+          }
+        } else {
+          finalChunks.push(transcript);
         }
-      } else {
-        interim += ev.results[i][0].transcript;
+      } else if(i >= ev.resultIndex){
+        interim += transcript;
       }
     }
+    finalTranscript = finalChunks.join(' ') + ' ';
     $('statusSub').textContent = (finalTranscript+interim).trim().slice(-90) || 'Listening...';
   };
   recognition.onerror = (ev)=>{
@@ -498,6 +517,18 @@ async function processTranslation(text){
 
     $('originalText').textContent = text;
     $('translatedText').textContent = parsed.translation || '—';
+
+    const corrected = (parsed.standard_form || '').trim();
+    const spoken = text.trim();
+    // Only show this card if grammar correction actually changed something —
+    // no point showing an identical duplicate of "You said".
+    if(corrected && corrected.toLowerCase() !== spoken.toLowerCase()){
+      $('correctedText').textContent = corrected;
+      $('correctedCard').style.display = 'block';
+    } else {
+      $('correctedCard').style.display = 'none';
+    }
+
     if(parsed.detected_dialect && parsed.detected_dialect.toLowerCase()!=='standard'){
       $('dialectPill').style.display='inline-flex';
       $('dialectName').textContent = 'Detected: '+parsed.detected_dialect;
