@@ -95,29 +95,40 @@ async def translate(payload: dict):
 
             data = resp.json()
 
-            if resp.status_code in (503, 429):
-                wait_seconds = 1.5 * attempt  # fallback if we can't read a suggested delay
-                if resp.status_code == 429:
-                    try:
-                        for detail in data.get("error", {}).get("details", []):
-                            if "retryDelay" in detail:
-                                wait_seconds = float(str(detail["retryDelay"]).rstrip("s")) + 0.5
-                                break
-                    except (ValueError, TypeError):
-                        wait_seconds = 7.0
+            if resp.status_code == 429:
+                wait_seconds = 10.0
+                try:
+                    for detail in data.get("error", {}).get("details", []):
+                        if "retryDelay" in detail:
+                            wait_seconds = float(str(detail["retryDelay"]).rstrip("s")) + 0.5
+                            break
+                except (ValueError, TypeError):
+                    pass
                 print(
-                    f"[translate] attempt {attempt}: status {resp.status_code} "
-                    f"({'overloaded' if resp.status_code == 503 else 'rate limited'}), "
+                    f"[translate] attempt {attempt}: rate limited (429). "
+                    f"NOT retrying automatically — that would burn more of the same "
+                    f"5-requests-per-minute quota. Telling client to wait {wait_seconds:.1f}s.",
+                    flush=True,
+                )
+                return JSONResponse(
+                    {
+                        "error": "gemini_rate_limited",
+                        "wait_seconds": wait_seconds,
+                        "detail": data,
+                    },
+                    status_code=429,
+                )
+
+            if resp.status_code == 503:
+                wait_seconds = 1.5 * attempt
+                print(
+                    f"[translate] attempt {attempt}: model overloaded (503), "
                     f"waiting {wait_seconds:.1f}s before retry",
                     flush=True,
                 )
                 last_error_response = JSONResponse(
-                    {
-                        "error": "gemini_overloaded" if resp.status_code == 503 else "gemini_rate_limited",
-                        "status": resp.status_code,
-                        "detail": data,
-                    },
-                    status_code=resp.status_code,
+                    {"error": "gemini_overloaded", "status": 503, "detail": data},
+                    status_code=503,
                 )
                 if attempt < max_attempts:
                     await asyncio.sleep(wait_seconds)
