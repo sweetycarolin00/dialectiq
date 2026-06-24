@@ -161,6 +161,12 @@
     font-size:11.5px;font-weight:700;border-radius:999px;padding:5px 12px;margin-bottom:10px;
   }
   .dialect-pill svg{width:11px;height:11px;}
+  .pill-row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:4px;}
+  .emotion-pill{
+    display:inline-flex;align-items:center;gap:6px;background:rgba(255,107,74,0.16);color:#ffd9cc;
+    font-size:11.5px;font-weight:700;border-radius:999px;padding:5px 12px;margin-bottom:10px;
+  }
+  .emotion-pill #emotionEmoji{font-size:13px;}
   .play-row{display:flex;align-items:center;gap:10px;margin-top:14px;}
   .play-btn{
     width:46px;height:46px;border-radius:50%;background:var(--coral);border:none;
@@ -271,10 +277,16 @@
     </div>
 
     <div class="card">
-      <span class="dialect-pill" id="dialectPill" style="display:none;">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 010 20 15 15 0 010-20z"/></svg>
-        <span id="dialectName"></span>
-      </span>
+      <div class="pill-row">
+        <span class="dialect-pill" id="dialectPill" style="display:none;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 010 20 15 15 0 010-20z"/></svg>
+          <span id="dialectName"></span>
+        </span>
+        <span class="emotion-pill" id="emotionPill" style="display:none;">
+          <span id="emotionEmoji">🙂</span>
+          <span id="emotionName"></span>
+        </span>
+      </div>
       <div class="card-label">Translation</div>
       <div class="card-text" id="translatedText">—</div>
       <div class="play-row">
@@ -535,9 +547,29 @@ async function processTranslation(text){
     } else {
       $('dialectPill').style.display='none';
     }
+
+    const emotion = (parsed.emotion || 'neutral').toLowerCase();
+    const EMOTION_MAP = {
+      neutral: {emoji:'😐', label:'Neutral'},
+      happy:   {emoji:'😊', label:'Happy'},
+      sad:     {emoji:'😢', label:'Sad'},
+      angry:   {emoji:'😠', label:'Angry'},
+      urgent:  {emoji:'⚡', label:'Urgent'},
+      worried: {emoji:'😟', label:'Worried'},
+      excited: {emoji:'🤩', label:'Excited'},
+      polite:  {emoji:'🙏', label:'Polite'},
+    };
+    if(EMOTION_MAP[emotion] && emotion !== 'neutral'){
+      $('emotionPill').style.display='inline-flex';
+      $('emotionEmoji').textContent = EMOTION_MAP[emotion].emoji;
+      $('emotionName').textContent = EMOTION_MAP[emotion].label;
+    } else {
+      $('emotionPill').style.display='none';
+    }
+    state.lastEmotion = emotion;
     buildWave();
     showScreen('screen-result');
-    playTranslation(parsed.translation);
+    playTranslation(parsed.translation, emotion);
   }catch(err){
     $('statusText').textContent='Something went wrong';
     $('statusSub').textContent='Check your connection and tap the mic to try again.';
@@ -554,18 +586,31 @@ function buildWave(){
   }
 }
 
-function playTranslation(text){
+const VOICE_TONE = {
+  neutral: {rate:0.95, pitch:1.0},
+  happy:   {rate:1.05, pitch:1.12},
+  sad:     {rate:0.85, pitch:0.88},
+  angry:   {rate:1.08, pitch:0.92},
+  urgent:  {rate:1.18, pitch:1.05},
+  worried: {rate:0.92, pitch:1.08},
+  excited: {rate:1.15, pitch:1.15},
+  polite:  {rate:0.9,  pitch:1.0},
+};
+
+function playTranslation(text, emotion){
   if(state.muted || !text) return;
   try{
     speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(text);
     u.lang = state.to.code;
-    u.rate = 0.95;
+    const tone = VOICE_TONE[emotion] || VOICE_TONE.neutral;
+    u.rate = tone.rate;
+    u.pitch = tone.pitch;
     speechSynthesis.speak(u);
   }catch(e){}
 }
 
-$('playBtn').addEventListener('click', ()=>playTranslation($('translatedText').textContent));
+$('playBtn').addEventListener('click', ()=>playTranslation($('translatedText').textContent, state.lastEmotion));
 
 $('speakAgainBtn').addEventListener('click', ()=>{
   showScreen('screen-speak');
