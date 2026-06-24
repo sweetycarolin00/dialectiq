@@ -525,6 +525,12 @@ async function processTranslation(text){
       })
     });
     const parsed = await response.json();
+
+    if(parsed.error === 'gemini_rate_limited'){
+      const waitSec = Math.ceil(parsed.wait_seconds || 10);
+      showRateLimitCountdown(waitSec);
+      return;
+    }
     if(parsed.error){ throw new Error(parsed.error); }
 
     $('originalText').textContent = text;
@@ -575,6 +581,25 @@ async function processTranslation(text){
     $('statusSub').textContent='Check your connection and tap the mic to try again.';
     $('spinnerDots').style.display='none';
   }
+}
+
+function showRateLimitCountdown(seconds){
+  $('spinnerDots').style.display='none';
+  $('micBtn').disabled = true;
+  let remaining = seconds;
+  const tick = ()=>{
+    $('statusText').textContent = 'Lots of requests right now';
+    $('statusSub').textContent = `Free plan limit — trying again in ${remaining}s...`;
+    if(remaining <= 0){
+      $('micBtn').disabled = false;
+      $('statusText').textContent = 'Tap the mic and speak';
+      $('statusSub').textContent = 'Should work now — go ahead.';
+      return;
+    }
+    remaining -= 1;
+    setTimeout(tick, 1000);
+  };
+  tick();
 }
 
 function buildWave(){
